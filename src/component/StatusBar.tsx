@@ -1,22 +1,15 @@
-import {useMemo} from 'react';
 import {StatusBar as RNStatusBar, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const StatusBar = () => {
   const {top} = useSafeAreaInsets();
-
-  const containerStyle = useMemo(() => {
-    return {
-      paddingTop: top,
-    };
-  }, [top]);
+  const backgroundColor = '#F7F7F7';
 
   return (
-    <View style={containerStyle}>
+    <View style={{paddingTop: top, backgroundColor}}>
       <RNStatusBar
         showHideTransition="slide"
         barStyle={'dark-content'}
-        backgroundColor={'#F7F7F7'}
         translucent
         animated
       />
