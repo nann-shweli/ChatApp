@@ -2,10 +2,15 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import Firebase
 
 @main
 class AppDelegate: RCTAppDelegate {
   override func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+    // Configure Firebase first, before React Native initialises its bridge,
+    // so that the native Firebase app is registered before the JS layer runs.
+    FirebaseApp.configure()
+
     self.moduleName = "ChatApp"
     self.dependencyProvider = RCTAppDependencyProvider()
 

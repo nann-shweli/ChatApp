@@ -1,44 +1,62 @@
 import React, {useState} from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {signInWithEmailAndPassword} from 'firebase/auth';
-import {auth} from '../firebase/Firebase';
+import {signIn} from '../services/authService';
 import Button from '../component/Button';
 import TextInput from '../component/TextInput';
 import Svg from '../assets/svg';
 
 const LoginScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleSignIn = async () => {
+    if (!email.trim() || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
     setLoading(true);
-    setError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      console.log('User signed in successfully');
-      navigation.replace('Home');
-    } catch (err) {
-      setError('Invalid email or password');
+      await signIn(email.trim(), password);
+      // Navigation is handled automatically by auth state change in AppNavigation
+    } catch (err: any) {
+      Alert.alert('Sign In Failed', 'Invalid email or password');
     }
     setLoading(false);
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Svg.LoginSvg width={300} height={300} style={styles.icon} />
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled">
+        <View style={styles.hero}>
+          <Svg.LoginSvg width={260} height={260} style={styles.icon} />
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>Sign in to continue</Text>
+        </View>
 
-        <Text style={styles.title}>Login</Text>
-        <View style={styles.loginForm}>
+        <View style={styles.form}>
           <TextInput
             placeholder="Email"
             value={email}
             onChangeText={setEmail}
             iconName="mail-outline"
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
           <TextInput
             placeholder="Password"
@@ -47,50 +65,38 @@ const LoginScreen = () => {
             secureTextEntry
             iconName="lock-closed-outline"
           />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
         </View>
-      </View>
 
-      <Button label="Sign In" onPress={handleSignIn} loading={loading} />
-      <Text style={styles.footerText}>
-        Don't have an account?{' '}
-        <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>
-          Sign Up
-        </Text>
-      </Text>
-    </View>
+        <Button label="Sign In" onPress={handleSignIn} loading={loading} />
+
+        <TouchableOpacity
+          style={styles.footer}
+          onPress={() => navigation.navigate('SignUp')}>
+          <Text style={styles.footerText}>
+            Don't have an account? <Text style={styles.link}>Sign Up</Text>
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
-export default LoginScreen;
-
 const styles = StyleSheet.create({
+  flex: {flex: 1},
   container: {
-    flex: 1,
-    padding: 20,
+    flexGrow: 1,
+    padding: 24,
     backgroundColor: '#F7F7F7',
+    justifyContent: 'center',
   },
-  loginForm: {gap: 12},
-  header: {flex: 1, justifyContent: 'center'},
-  icon: {alignItems: 'center', alignSelf: 'center'},
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
-  },
-  error: {
-    color: 'red',
-    marginBottom: 10,
-  },
-  footerText: {
-    marginTop: 15,
-    fontSize: 14,
-    color: '#666',
-    alignSelf: 'center',
-  },
-  link: {
-    color: '#007AFF',
-    fontWeight: 'bold',
-  },
+  hero: {alignItems: 'center', marginBottom: 32},
+  icon: {},
+  title: {fontSize: 28, fontWeight: '700', color: '#111', marginTop: 8},
+  subtitle: {fontSize: 15, color: '#666', marginTop: 4},
+  form: {gap: 12, marginBottom: 24},
+  footer: {marginTop: 20, alignItems: 'center'},
+  footerText: {fontSize: 14, color: '#666'},
+  link: {color: '#128C7E', fontWeight: '700'},
 });
+
+export default LoginScreen;

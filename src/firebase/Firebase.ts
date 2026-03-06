@@ -1,23 +1,12 @@
-import {initializeApp, getApps, getApp} from 'firebase/app';
-import {getAuth} from 'firebase/auth';
-import {getFirestore} from 'firebase/firestore';
-import {getStorage} from 'firebase/storage';
+import firebaseApp from '@react-native-firebase/app';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
+import storage from '@react-native-firebase/storage';
+import database from '@react-native-firebase/database';
+import messaging from '@react-native-firebase/messaging';
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyDUJ_NSBCg39bLwsb3ek-CcTeHSwPEOwaA',
-  authDomain: 'chatapp-3429f.firebaseapp.com',
-  projectId: 'chatapp-3429f',
-  storageBucket: 'chatapp-3429f.appspot.com',
-  messagingSenderId: '165487971218',
-  appId: '1:165487971218:web:bd697a94ac90384c26cf4b',
-  measurementId: 'G-SE1CJWF8FK',
-};
+// Native Firebase SDKs auto-initialise from google-services.json / GoogleService-Info.plist
+// No manual initializeApp() needed with the native modules.
 
-// Ensure Firebase is initialized only once
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-export {auth, db, storage};
+export {auth, firestore, storage, database, messaging};
+export default firebaseApp;

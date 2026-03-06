@@ -10,14 +10,20 @@ type ButtonProps = {
   label: string;
   onPress?: () => void;
   loading?: boolean;
+  disabled?: boolean;
 };
 
-const Button = ({label, onPress, loading = false}: ButtonProps) => {
+const Button = ({
+  label,
+  onPress,
+  loading = false,
+  disabled = false,
+}: ButtonProps) => {
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={styles.container}
-      disabled={loading}>
+      style={[styles.container, (disabled || loading) && styles.disabled]}
+      disabled={disabled || loading}>
       {loading ? (
         <ActivityIndicator color="#fff" />
       ) : (
@@ -29,11 +35,14 @@ const Button = ({label, onPress, loading = false}: ButtonProps) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#000',
+    backgroundColor: '#128C7E',
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
+  },
+  disabled: {
+    backgroundColor: '#ccc',
   },
   label: {
     color: '#fff',

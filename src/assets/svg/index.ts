@@ -1,3 +1,3 @@
-import LoginSvg from '../svg/LoginThree.svg';
+import LoginSvg from './LoginThree.svg';
 
 export default {LoginSvg};
