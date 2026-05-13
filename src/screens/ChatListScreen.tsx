@@ -15,8 +15,8 @@ import ChatListItem from '../component/ChatListItem';
 import Avatar from '../component/Avatar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import SearchBar from '../component/SearchBar';
-import {signOut} from '../services/authService';
 import {UserConversationItem} from '../types';
+import {getUserDisplayName} from '../utils/userDisplay';
 
 const ChatListScreen = () => {
   const navigation = useNavigation<any>();
@@ -34,12 +34,10 @@ const ChatListScreen = () => {
     }
     const lowerQuery = searchQuery.toLowerCase();
     const filtered = items.filter(item => {
-      const name = (
-        item.otherUser?.displayName ??
-        item.conversation?.name ??
-        ''
-      ).toLowerCase();
-      return name.includes(lowerQuery);
+      const name = item.otherUser
+        ? getUserDisplayName(item.otherUser)
+        : item.conversation?.name ?? '';
+      return name.toLowerCase().includes(lowerQuery);
     });
     setFilteredItems(filtered);
   }, [items, searchQuery]);
@@ -50,7 +48,9 @@ const ChatListScreen = () => {
   const handleOpenChat = useCallback(
     (item: any) => {
       const title =
-        item.otherUser?.displayName ?? item.conversation?.name ?? 'Chat';
+        (item.otherUser ? getUserDisplayName(item.otherUser) : null) ??
+        item.conversation?.name ??
+        'Chat';
       navigation.navigate('Chat', {
         cid: item.cid,
         title,
@@ -60,19 +60,11 @@ const ChatListScreen = () => {
     [navigation],
   );
 
-  const handleSignOut = async () => {
-    await signOut();
-  };
-
   const renderItem = useCallback(
     ({item}: {item: any}) => (
-      <ChatListItem
-        item={item}
-        currentUid={user?.uid ?? ''}
-        onPress={() => handleOpenChat(item)}
-      />
+      <ChatListItem item={item} onPress={() => handleOpenChat(item)} />
     ),
-    [user?.uid, handleOpenChat],
+    [handleOpenChat],
   );
 
   return (
@@ -91,7 +83,7 @@ const ChatListScreen = () => {
             style={styles.iconBtn}>
             <Avatar
               uri={user?.photoURL ?? undefined}
-              name={user?.displayName ?? ''}
+              name={getUserDisplayName(user)}
               size={32}
             />
           </TouchableOpacity>

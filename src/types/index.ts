@@ -6,10 +6,14 @@ export type Timestamp = FirebaseFirestoreTypes.Timestamp;
 export interface User {
   uid: string;
   displayName: string;
+  displayNameLowercase?: string;
   photoURL: string;
   email: string;
+  emailLowercase?: string;
+  phoneNumber?: string;
   fcmToken?: string;
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 // ─── Conversation ────────────────────────────────────────────────────────────
@@ -20,6 +24,7 @@ export interface Conversation {
   type: ConversationType;
   name?: string; // group only
   photoURL?: string; // group only
+  memberIds?: string[];
   lastMessage: string;
   lastMessageAt: Timestamp;
   lastSenderId: string;

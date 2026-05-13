@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ─────────────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    function isMember(cid) {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/conversations/$(cid)/members/$(request.auth.uid));
+    }
+
+    function isListedMember() {
+      return isAuth() &&
+        resource.data.memberIds is list &&
+        request.auth.uid in resource.data.memberIds;
+    }
+
+    function isCreatingConversationForSelf() {
+      return isAuth() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.memberIds is list &&
+        request.auth.uid in request.resource.data.memberIds;
+    }
+
+    // ── users/{uid} ───────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if isAuth();
+      allow create: if isUser(uid);
+      allow update: if isUser(uid);
+      allow delete: if false;
+    }
+
+    // ── conversations/{cid} ───────────────────────────────────────────────────
+    match /conversations/{cid} {
+      allow read: if isMember(cid) || isListedMember();
+      allow create: if isCreatingConversationForSelf();
+      // Cloud Functions update last message metadata.
+      allow update: if false;
+      allow delete: if false;
+
+      // ── members/{uid} ─────────────────────────────────────────────────────
+      match /members/{uid} {
+        allow read: if isMember(cid);
+        // Any member can add another member (for group creation)
+        allow create: if isAuth();
+        // Only the member themselves may update their own lastReadAt / muted
+        allow update: if isUser(uid) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['lastReadAt', 'muted']);
+        allow delete: if isUser(uid);
+      }
+
+      // ── messages/{mid} ────────────────────────────────────────────────────
+      match /messages/{mid} {
+        allow read: if isMember(cid);
+        allow create: if isMember(cid) &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.createdAt == request.time;
+        // No client-side updates to messages (soft-delete via Cloud Function)
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+
+    // ── userConversations/{uid}/items/{cid} ───────────────────────────────────
+    match /userConversations/{uid}/items/{cid} {
+      allow read: if isUser(uid);
+      allow create: if isUser(uid);
+      allow update: if isUser(uid) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['muted', 'archived', 'unreadCount', 'cid']);
+      allow delete: if false;
+    }
+  }
+}

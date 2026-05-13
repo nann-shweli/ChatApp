@@ -9,10 +9,10 @@
 /* Begin PBXBuildFile section */
 		015B04A12280EC2716D7589E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		3F3806572D8319C1008F4B7B /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3F3806562D8319C1008F4B7B /* GoogleService-Info.plist */; };
 		5014E031082AD0636FB8456C /* Pods_ChatApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C904A91471C023C3AF616D12 /* Pods_ChatApp.framework */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
-		3F3806572D8319C1008F4B7B /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3F3806562D8319C1008F4B7B /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */

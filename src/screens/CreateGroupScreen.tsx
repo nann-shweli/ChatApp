@@ -16,6 +16,7 @@ import {User} from '../types';
 import Avatar from '../component/Avatar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Button from '../component/Button';
+import {getUserDisplayName} from '../utils/userDisplay';
 
 const CreateGroupScreen = () => {
   const navigation = useNavigation<any>();
@@ -77,8 +78,8 @@ const CreateGroupScreen = () => {
       <TouchableOpacity
         style={styles.userRow}
         onPress={() => toggleSelect(item.uid)}>
-        <Avatar uri={item.photoURL} name={item.displayName} size={40} />
-        <Text style={styles.userName}>{item.displayName}</Text>
+        <Avatar uri={item.photoURL} name={getUserDisplayName(item)} size={40} />
+        <Text style={styles.userName}>{getUserDisplayName(item)}</Text>
         <Icon
           name={isSelected ? 'checkbox' : 'square-outline'}
           size={24}

@@ -77,3 +77,4 @@ yarn-error.log
 
 ios/ChatApp/GoogleService-Info.plist
 android/app/google-services.json
+functions/serviceAccountKey.json

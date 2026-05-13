@@ -3,8 +3,13 @@ import firestore, {
 } from '@react-native-firebase/firestore';
 import {v4 as uuidv4} from '../utils/uuid';
 import {Message, MessageType, UserConversationItem, User} from '../types';
+import {normalizeSearchValue} from '../utils/userDisplay';
 
 const PAGE_SIZE = 30;
+
+const documentExists = (
+  snap: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
+) => (typeof snap.exists === 'function' ? snap.exists() : Boolean(snap.exists));
 
 // ─── Conversation helpers ─────────────────────────────────────────────────────
 
@@ -16,19 +21,28 @@ export const getOrCreateDirectConversation = async (
   currentUid: string,
   otherUid: string,
 ): Promise<string> => {
-  // Check if a direct conversation already exists (query userConversations)
-  // We store a deterministic cid for direct chats so we don't need a complex query
   const directCid = [currentUid, otherUid].sort().join('_');
 
   const convRef = firestore().collection('conversations').doc(directCid);
-  const convSnap = await convRef.get();
+  let convExists = false;
 
-  if (!convSnap.exists) {
+  try {
+    const convSnap = await convRef.get();
+    convExists = documentExists(convSnap);
+  } catch (err) {
+    // A brand-new direct chat has no member docs yet, so rules may deny this
+    // preflight read. The deterministic ID still lets us safely try creation.
+    convExists = false;
+  }
+
+  if (!convExists) {
     const batch = firestore().batch();
+    const memberIds = [currentUid, otherUid].sort();
 
     // Create conversation doc
     batch.set(convRef, {
       type: 'direct',
+      memberIds,
       lastMessage: '',
       lastMessageAt: firestore.FieldValue.serverTimestamp(),
       lastSenderId: '',
@@ -56,7 +70,8 @@ export const getOrCreateDirectConversation = async (
       joinedAt: firestore.FieldValue.serverTimestamp(),
     });
 
-    // Bootstrap userConversations for both users
+    // Bootstrap the current user's list immediately. Cloud Functions fan this
+    // out to all members after creation/messages using Admin privileges.
     const emptyItem = {
       cid: directCid,
       lastMessagePreview: '',
@@ -75,16 +90,13 @@ export const getOrCreateDirectConversation = async (
       emptyItem,
     );
 
-    batch.set(
-      firestore()
-        .collection('userConversations')
-        .doc(otherUid)
-        .collection('items')
-        .doc(directCid),
-      emptyItem,
-    );
-
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (err: any) {
+      if (err?.code !== 'firestore/permission-denied') {
+        throw err;
+      }
+    }
   }
 
   return directCid;
@@ -104,6 +116,7 @@ export const createGroupConversation = async (
     type: 'group',
     name: groupName,
     photoURL: '',
+    memberIds: allMembers,
     lastMessage: '',
     lastMessageAt: firestore.FieldValue.serverTimestamp(),
     lastSenderId: '',
@@ -119,23 +132,23 @@ export const createGroupConversation = async (
       muted: false,
       joinedAt: firestore.FieldValue.serverTimestamp(),
     });
-
-    batch.set(
-      firestore()
-        .collection('userConversations')
-        .doc(uid)
-        .collection('items')
-        .doc(cid),
-      {
-        cid,
-        lastMessagePreview: '',
-        lastMessageAt: firestore.FieldValue.serverTimestamp(),
-        unreadCount: 0,
-        muted: false,
-        archived: false,
-      },
-    );
   }
+
+  batch.set(
+    firestore()
+      .collection('userConversations')
+      .doc(currentUid)
+      .collection('items')
+      .doc(cid),
+    {
+      cid,
+      lastMessagePreview: '',
+      lastMessageAt: firestore.FieldValue.serverTimestamp(),
+      unreadCount: 0,
+      muted: false,
+      archived: false,
+    },
+  );
 
   await batch.commit();
   return cid;
@@ -252,6 +265,13 @@ export const fetchOlderMessages = async (
 // ─── Read receipt ─────────────────────────────────────────────────────────────
 
 export const markAsRead = async (cid: string, uid: string) => {
+  const itemRef = firestore()
+    .collection('userConversations')
+    .doc(uid)
+    .collection('items')
+    .doc(cid);
+  const itemSnap = await itemRef.get();
+
   await Promise.all([
     firestore()
       .collection('conversations')
@@ -259,12 +279,9 @@ export const markAsRead = async (cid: string, uid: string) => {
       .collection('members')
       .doc(uid)
       .update({lastReadAt: firestore.FieldValue.serverTimestamp()}),
-    firestore()
-      .collection('userConversations')
-      .doc(uid)
-      .collection('items')
-      .doc(cid)
-      .update({unreadCount: 0}),
+    documentExists(itemSnap)
+      ? itemRef.update({unreadCount: 0})
+      : Promise.resolve(),
   ]);
 };
 
@@ -289,7 +306,7 @@ export const listenMemberReadAt = (
 
 export const getConversation = async (cid: string) => {
   const snap = await firestore().collection('conversations').doc(cid).get();
-  return Boolean(snap.exists) ? snap.data() : null;
+  return documentExists(snap) ? snap.data() : null;
 };
 
 export const getConversationMembers = async (cid: string) => {
@@ -303,46 +320,102 @@ export const getConversationMembers = async (cid: string) => {
 
 // ─── User search ─────────────────────────────────────────────────────────────
 
+const mapUserDoc = (
+  doc: FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
+) =>
+  ({
+    uid: doc.data().uid ?? doc.id,
+    displayName: doc.data().displayName ?? '',
+    displayNameLowercase: doc.data().displayNameLowercase ?? '',
+    email: doc.data().email ?? '',
+    emailLowercase: doc.data().emailLowercase ?? '',
+    photoURL: doc.data().photoURL ?? '',
+    phoneNumber: doc.data().phoneNumber ?? '',
+    fcmToken: doc.data().fcmToken,
+    createdAt: doc.data().createdAt,
+    updatedAt: doc.data().updatedAt,
+  } as User);
+
+const filterVisibleUsers = (users: User[], currentUid: string) =>
+  users.filter(user => user.uid && user.uid !== currentUid);
+
+const matchesUserQuery = (user: User, lowercaseQuery: string) =>
+  (user.displayNameLowercase || user.displayName || '')
+    .toLowerCase()
+    .includes(lowercaseQuery) ||
+  (user.emailLowercase || user.email || '')
+    .toLowerCase()
+    .includes(lowercaseQuery);
+
+const searchUserField = async (field: string, lowercaseQuery: string) => {
+  const snapshot = await firestore()
+    .collection('users')
+    .orderBy(field)
+    .startAt(lowercaseQuery)
+    .endAt(`${lowercaseQuery}\uf8ff`)
+    .limit(25)
+    .get();
+
+  return snapshot.docs.map(mapUserDoc);
+};
+
 export const searchUsers = async (
   query: string,
   currentUid: string,
 ): Promise<User[]> => {
-  const trimmed = query.trim();
-  if (trimmed.length === 0) return [];
+  const lowercaseQuery = normalizeSearchValue(query);
+  if (!lowercaseQuery) return [];
 
-  const usersRef = firestore().collection('users');
-  let snap;
+  const [nameResults, emailResults, legacySnapshot] = await Promise.all([
+    searchUserField('displayNameLowercase', lowercaseQuery),
+    searchUserField('emailLowercase', lowercaseQuery),
+    firestore().collection('users').limit(50).get(),
+  ]);
 
-  if (trimmed.includes('@')) {
-    // Search by email - try both original and lowercase for compatibility
-    const variations = Array.from(new Set([trimmed, trimmed.toLowerCase()]));
-    snap = await usersRef.where('email', 'in', variations).get();
-  } else {
-    // Search by name (prefix match)
-    snap = await usersRef
-      .where('displayName', '>=', trimmed)
-      .where('displayName', '<=', trimmed + '\uf8ff')
-      .limit(20)
-      .get();
-  }
+  const usersByUid = new Map<string, User>();
+  [...nameResults, ...emailResults, ...legacySnapshot.docs.map(mapUserDoc)]
+    .filter(user => matchesUserQuery(user, lowercaseQuery))
+    .forEach(user => usersByUid.set(user.uid, user));
 
-  return snap.docs
-    .map(d => d.data() as User)
-    .filter(u => u.uid !== currentUid);
+  return filterVisibleUsers(Array.from(usersByUid.values()), currentUid);
 };
 
 export const getAllUsers = async (currentUid: string): Promise<User[]> => {
-  const snap = await firestore()
-    .collection('users')
-    .orderBy('displayName')
-    .limit(50)
-    .get();
-  return snap.docs
-    .map(d => d.data() as User)
-    .filter(u => u.uid !== currentUid);
+  try {
+    const snapshot = await firestore().collection('users').get();
+    return filterVisibleUsers(snapshot.docs.map(mapUserDoc), currentUid);
+  } catch (e) {
+    console.error('getAllUsers error:', e);
+    return [];
+  }
 };
 
 export const getUserById = async (uid: string): Promise<User | null> => {
   const snap = await firestore().collection('users').doc(uid).get();
-  return Boolean(snap.exists) ? (snap.data() as User) : null;
+  return documentExists(snap) ? (snap.data() as User) : null;
+};
+
+export const seedDemoMate = async () => {
+  const uid = 'demo-chat-mate';
+  const displayName = 'Chat Mate';
+  const email = 'mate@demo.com';
+
+  await firestore()
+    .collection('users')
+    .doc(uid)
+    .set(
+      {
+        uid,
+        displayName,
+        displayNameLowercase: normalizeSearchValue(displayName),
+        email,
+        emailLowercase: normalizeSearchValue(email),
+        photoURL: '',
+        phoneNumber: '',
+        fcmToken: '',
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp(),
+      },
+      {merge: true},
+    );
 };

@@ -18,6 +18,7 @@ import {User} from '../types';
 import SearchBar from '../component/SearchBar';
 import Avatar from '../component/Avatar';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {getUserDisplayName} from '../utils/userDisplay';
 
 const NewChatScreen = () => {
   const navigation = useNavigation<any>();
@@ -26,23 +27,27 @@ const NewChatScreen = () => {
   const [results, setResults] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [creatingCid, setCreatingCid] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    if (query.length !== 0) return;
+
     const fetchDefault = async () => {
-      if (!user?.uid) return;
       setLoading(true);
       try {
         const users = await getAllUsers(user.uid);
         setResults(users);
-      } catch {
+      } catch (err: any) {
         setResults([]);
+        setErrorMsg(err?.message || 'Failed to get users');
       }
       setLoading(false);
     };
-    if (query.length === 0) {
-      fetchDefault();
-    }
+
+    fetchDefault();
   }, [user?.uid, query.length]);
+
   const handleSearch = useCallback(
     async (text: string) => {
       setQuery(text);
@@ -52,10 +57,13 @@ const NewChatScreen = () => {
       }
       setLoading(true);
       try {
+        setErrorMsg(null);
         const users = await searchUsers(text.trim(), user?.uid ?? '');
         setResults(users);
-      } catch {
+      } catch (err: any) {
         setResults([]);
+        setErrorMsg(err?.message || 'Search failed');
+        console.error('searchUsers Error:', err);
       }
       setLoading(false);
     },
@@ -67,16 +75,19 @@ const NewChatScreen = () => {
       if (!user?.uid) return;
       setCreatingCid(otherUser.uid);
       try {
+        setErrorMsg(null);
         const cid = await getOrCreateDirectConversation(
           user.uid,
           otherUser.uid,
         );
         navigation.replace('Chat', {
           cid,
-          title: otherUser.displayName,
+          title: getUserDisplayName(otherUser),
           otherUid: otherUser.uid,
         });
-      } catch {
+      } catch (err: any) {
+        setErrorMsg(err?.message || 'Could not create chat');
+      } finally {
         setCreatingCid(null);
       }
     },
@@ -106,7 +117,15 @@ const NewChatScreen = () => {
         </TouchableOpacity>
       )}
 
-      {query.length === 0 && results.length > 0 && (
+      {errorMsg ? (
+        <View style={{padding: 16}}>
+          <Text style={{color: 'red', fontSize: 13, fontWeight: 'bold'}}>
+            {errorMsg}
+          </Text>
+        </View>
+      ) : null}
+
+      {query.length === 0 && results.length > 0 && !errorMsg && (
         <Text style={styles.sectionHeader}>Suggested Users</Text>
       )}
 
@@ -123,9 +142,13 @@ const NewChatScreen = () => {
               style={styles.userRow}
               onPress={() => handleSelectUser(item)}
               disabled={creatingCid === item.uid}>
-              <Avatar uri={item.photoURL} name={item.displayName} size={44} />
+              <Avatar
+                uri={item.photoURL}
+                name={getUserDisplayName(item)}
+                size={44}
+              />
               <View style={styles.userInfo}>
-                <Text style={styles.name}>{item.displayName}</Text>
+                <Text style={styles.name}>{getUserDisplayName(item)}</Text>
                 <Text style={styles.email}>{item.email}</Text>
               </View>
               {creatingCid === item.uid && (

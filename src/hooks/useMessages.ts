@@ -1,4 +1,4 @@
-import {useEffect, useState, useCallback, useRef} from 'react';
+import {useEffect, useState, useCallback} from 'react';
 import {listenMessages, fetchOlderMessages} from '../services/chatService';
 import {Message} from '../types';
 

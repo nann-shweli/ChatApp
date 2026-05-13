@@ -1,4 +1,4 @@
-import React, {useEffect, useCallback, useState, useRef} from 'react';
+import React, {useEffect, useCallback, useState} from 'react';
 import {
   View,
   FlatList,
@@ -54,6 +54,7 @@ const ChatScreen = () => {
     useState<FirebaseFirestoreTypes.Timestamp | null>(null);
   const [uploading, setUploading] = useState(false);
   const [lightboxUri, setLightboxUri] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // Presence for direct chats
   useEffect(() => {
@@ -76,15 +77,20 @@ const ChatScreen = () => {
 
   const handleSendText = useCallback(
     async (text: string) => {
-      stopTyping();
-      await sendMessage({
-        cid,
-        senderId: uid,
-        type: 'text',
-        text,
-        clientId: uuidv4(),
-      });
-      markAsRead(cid, uid).catch(() => {});
+      try {
+        setSendError(null);
+        stopTyping();
+        await sendMessage({
+          cid,
+          senderId: uid,
+          type: 'text',
+          text,
+          clientId: uuidv4(),
+        });
+        markAsRead(cid, uid).catch(() => {});
+      } catch (err: any) {
+        setSendError(err?.message || 'Message failed to send');
+      }
     },
     [cid, uid, stopTyping],
   );
@@ -93,6 +99,7 @@ const ChatScreen = () => {
     async (localUri: string) => {
       setUploading(true);
       try {
+        setSendError(null);
         const mid = uuidv4();
         const url = await uploadImage(cid, mid, localUri);
         await sendMessage({
@@ -102,8 +109,8 @@ const ChatScreen = () => {
           mediaUrl: url,
           clientId: mid,
         });
-      } catch {
-        // TODO: show toast
+      } catch (err: any) {
+        setSendError(err?.message || 'Image failed to send');
       } finally {
         setUploading(false);
       }
@@ -203,6 +210,11 @@ const ChatScreen = () => {
 
         {/* Typing indicator */}
         {typingUids.length > 0 && <TypingIndicator typingUids={typingUids} />}
+        {sendError ? (
+          <View style={styles.errorBar}>
+            <Text style={styles.errorText}>{sendError}</Text>
+          </View>
+        ) : null}
       </View>
 
       <MessageInput
@@ -255,6 +267,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   lightboxImage: {width: '100%', height: '80%'},
+  errorBar: {
+    backgroundColor: '#FDECEA',
+    borderTopWidth: 1,
+    borderTopColor: '#F5C6CB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  errorText: {color: '#B00020', fontSize: 13},
 });
 
 export default ChatScreen;

@@ -9,18 +9,18 @@ import {
   ActivityIndicator,
   Clipboard,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
 import {useAppSelector} from '../store';
 import {signOut, updateUserProfile} from '../services/authService';
+import {seedDemoMate} from '../services/chatService';
 import {uploadAvatar} from '../services/storageService';
 import {launchImageLibrary} from 'react-native-image-picker';
 import Avatar from '../component/Avatar';
 import TextInput from '../component/TextInput';
 import Button from '../component/Button';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {getUserDisplayName} from '../utils/userDisplay';
 
 const ProfileScreen = () => {
-  const navigation = useNavigation<any>();
   const user = useAppSelector(state => state.auth.user);
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [saving, setSaving] = useState(false);
@@ -56,6 +56,18 @@ const ProfileScreen = () => {
     setSaving(false);
   };
 
+  const handleAddMate = async () => {
+    try {
+      await seedDemoMate();
+      Alert.alert(
+        'Success',
+        'Search for "mate@demo.com" or look for "Chat Mate" in New Chat!',
+      );
+    } catch {
+      Alert.alert('Error', 'Could not add mate');
+    }
+  };
+
   const handleSignOut = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       {text: 'Cancel', style: 'cancel'},
@@ -79,7 +91,7 @@ const ProfileScreen = () => {
           style={styles.avatarWrapper}>
           <Avatar
             uri={user?.photoURL ?? undefined}
-            name={user?.displayName ?? ''}
+            name={getUserDisplayName(user)}
             size={90}
           />
           <View style={styles.editBadge}>
@@ -129,6 +141,11 @@ const ProfileScreen = () => {
       </View>
 
       <Button label="Save Changes" onPress={handleSave} loading={saving} />
+
+      <TouchableOpacity style={styles.mateBtn} onPress={handleAddMate}>
+        <Icon name="people-outline" size={20} color="#128C7E" />
+        <Text style={styles.mateBtnText}>Add a Chat Mate (for testing)</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
         <Icon name="log-out-outline" size={20} color="#e74c3c" />
@@ -190,6 +207,18 @@ const styles = StyleSheet.create({
   signOutText: {color: '#e74c3c', fontWeight: '600', fontSize: 16},
   copyIcon: {marginLeft: 'auto'},
   hint: {fontSize: 12, color: '#999', marginTop: 4, fontStyle: 'italic'},
+  mateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+  },
+  mateBtnText: {color: '#128C7E', fontWeight: '600', fontSize: 16},
 });
 
 export default ProfileScreen;

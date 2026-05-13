@@ -3,10 +3,10 @@ import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {format, isToday, isYesterday} from 'date-fns';
 import {UserConversationItem} from '../types';
 import Avatar from './Avatar';
+import {getUserDisplayName} from '../utils/userDisplay';
 
 interface ChatListItemProps {
   item: UserConversationItem;
-  currentUid: string;
   onPress: () => void;
 }
 
@@ -18,11 +18,11 @@ const formatTime = (ts: any): string => {
   return format(date, 'dd/MM/yy');
 };
 
-const ChatListItem = ({item, currentUid, onPress}: ChatListItemProps) => {
+const ChatListItem = ({item, onPress}: ChatListItemProps) => {
   const isGroup = !item.otherUser;
   const name = isGroup
     ? item.conversation?.name ?? 'Group'
-    : item.otherUser?.displayName ?? 'Unknown';
+    : getUserDisplayName(item.otherUser);
   const photo = isGroup
     ? item.conversation?.photoURL
     : item.otherUser?.photoURL;
